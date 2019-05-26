@@ -25,7 +25,7 @@ contract Tandapay {
         uint etherBalance;
     }
 
-    Group[] groups;
+    mapping(uint => Group) groups;
     address public administrator;
     uint public groupIndex; //count
     
@@ -33,26 +33,28 @@ contract Tandapay {
         require(groups[groupId].secretary == msg.sender);
         _;
     }
+    
     modifier validId(uint groupId) {
-        /////////////////////////////////////////
-        // Bobo implementation, should be changed
-        /////////////////////////////////////////
-        require(groups.length >= groupId); 
+        // groupIndex starts at 1, so all created groups have groupId greater than 0
+        // I think this is how a mapping of structs works
+        require(groups[groupId].groupId != 0); 
         _;
     }
 
     function Tandpay() public {
         administrator = msg.sender;
-        groupIndex = 0;
+        groupIndex = 1;
     }
 
     function makeGroup(address secretary, address[] policyholders, uint premium, uint maxClaim) public {
+        require(msg.sender == administrator);
         require(policyholders.length >= minGroupSize);
         require(maxClaim <= premium * policyholders.length);
         ///////////////////////////////////////////////////////////////////////////////////
         // Do we want to add a check to make sure all elements of policyholders are unique?
         // If there are duplicates, it messes up paidPremiumCount logic.
         //////////////////////////////////////////////////////////////////////////////////
+        
         Group memory newGroup = Group({
             groupId: groupIndex,
             secretary: secretary,
@@ -66,19 +68,17 @@ contract Tandapay {
             etherBalance: 0
         });
         
-        groups.push(newGroup);
+        groups[groupIndex] = newGroup;
         
         // Use userList to initialize userMapping
         Group storage currentGroup = groups[groupIndex];
         for (uint i = 0; i < currentGroup.userList.length; i++) {
             currentGroup.userMapping[currentGroup.userList[i]] = 1;
         }
-        
         require(currentGroup.userMapping[secretary] == 1); // Checks if secreatry was one of the passed in policyholders
         
         groupIndex += 1;
     }
-    
 
     // A Secretary can initiate a period for policyholders to send in their premiums
     function startPrePeriod(uint groupId) public secretaryOnly(groupId) validId(groupId) {
