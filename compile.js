@@ -5,4 +5,6 @@ const solc = require('solc');
 const contractPath = path.resolve(__dirname, 'contracts', 'TandaPay.sol');
 const source = fs.readFileSync(contractPath, 'utf8');
 
-module.exports = solc.compile(source, 1).contracts[':TandaPay'];
+// console.log(solc.compile(source, 1).contracts[':Tandapay']);
+
+module.exports = solc.compile(source, 1).contracts[':Tandapay'];
