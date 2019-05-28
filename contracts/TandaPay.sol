@@ -3,11 +3,10 @@ pragma solidity ^0.4.17;
 
 contract Tandapay {
     uint public minGroupSize = 10; //Set 10 for testing purpose
-    enum Phase {INACTIVE, PRE, ACTIVE, POST}
     // userMapping code: {0: not in group, 1: in group but not paid for any active periods, 2: in group and paid}
 
     struct Period {
-        Phase phase;
+        bool active;
         uint startTime;
     }
 
@@ -20,9 +19,9 @@ contract Tandapay {
         uint paidPremiumCount;
         uint premium;
         uint maxClaim;
-        Period oldPeriod;
-        Period newPeriod;
-        uint currentPeriod; // Which Period is in the active phase
+        Period prePeriod;
+        Period activePeriod;
+        Period postPeriod;
         uint etherBalance;
         /* Keep track of period */
         uint periodCount;
@@ -58,9 +57,9 @@ contract Tandapay {
             paidPremiumCount: 0,
             premium: premium,
             maxClaim: maxClaim,
-            oldPeriod: Period(Phase.INACTIVE, now),
-            newPeriod: Period(Phase.INACTIVE, now),
-            currentPeriod: 2, // Initialize group with newPeriod as the currentPeriod so that only newPeriod can be in the PRE phase
+            prePeriod: Period(false, now),
+            activePeriod: Period(false, now),
+            postPeriod: Period(false, now),
             etherBalance: 0,
             periodCount: 1,
             policyholderCount: policyholders.length
@@ -83,43 +82,59 @@ contract Tandapay {
     function startPrePeriod(uint groupId) public secretaryOnly(groupId) {
         Group storage currentGroup = groups[groupId];
 
-        currentGroup.oldPeriod = currentGroup.newPeriod;
-        currentGroup.newPeriod = Period(Phase.PRE, now);
+        currentGroup.prePeriod = Period(true, now);
+        currentGroup.postPeriod = Period(false, now);
+
+        /////////////////////////////////////////////
+        // TODO: add logic that enforces 3 day window
+        /////////////////////////////////////////////
     }
 
     // A policyholder can send a premium payment to a group
     function sendPremium(uint groupId) public payable {
-      Group storage currentGroup = groups[groupId]; //If groupId is not valid, errors here
-      require(msg.value == currentGroup.premium);
-      require(currentGroup.newPeriod.phase == Phase.PRE); // Assume any Period in pre-period phase is the newPeriod
-      require(currentGroup.userMapping[msg.sender] == currentGroup.periodCount); // User is part of group and has not paid the premium
+        Group storage currentGroup = groups[groupId]; //If groupId is not valid, errors here
+        require(msg.value == currentGroup.premium);
+        require(currentGroup.prePeriod.active); // Assume any Period in pre-period phase is the newPeriod
+        require(currentGroup.userMapping[msg.sender] == currentGroup.periodCount); // User is part of group and has not paid the premium
 
-      currentGroup.userMapping[msg.sender]++;
-      currentGroup.etherBalance += msg.value;
-      currentGroup.paidPremiumCount += 1;
+        currentGroup.userMapping[msg.sender]++;
+        currentGroup.etherBalance += msg.value;
+        currentGroup.paidPremiumCount += 1;
     }
 
     // A Secretary can start the active period
     function startActivePeriod(uint groupId) public secretaryOnly(groupId){
-      Group storage currentGroup = groups[groupId];//If groupId is not valid, errors here
+        Group storage currentGroup = groups[groupId];//If groupId is not valid, errors here
 
-      require(currentGroup.paidPremiumCount == currentGroup.policyholderCount); //All premiums have been paid
-      require(currentGroup.newPeriod.phase == Phase.PRE); //Group is not active
+        require(currentGroup.paidPremiumCount == currentGroup.policyholderCount); //All premiums have been paid
+        require(currentGroup.prePeriod.active); //Group is not active
 
-      currentGroup.newPeriod.phase = Phase.ACTIVE;
-      currentGroup.currentPeriod = 2;
+        currentGroup.activePeriod = Period(true, now);
+        currentGroup.prePeriod.active = false;
 
-      currentGroup.paidPremiumCount = 0;
-      currentGroup.periodCount++;
+        currentGroup.paidPremiumCount = 0;
+        currentGroup.periodCount++;
     }
 
     // A Secretary can end the active period and start the post period
     // The secretary also has the option to continue to another period if there have been no claims
-    /*function endActivePeriod(uint groupId) public secretaryOnly(groupId) {
+    function endActivePeriod(uint groupId, bool continueToPeriod) public secretaryOnly(groupId) {
         Group storage currentGroup = groups[groupId];
 
-        require(true);
-    }*/
+        if (continueToPeriod) {
+            require(true); // No claims have been filed
+        }
+        require(currentGroup.activePeriod.active);
+        require(currentGroup.activePeriod.startTime <= now - 30 days);
+
+        currentGroup.activePeriod.active = false;
+        currentGroup.postPeriod = Period(true, now);
+
+        if (continueToPeriod) {
+            startActivePeriod(groupId);
+        }
+
+    }
 
     function getGroupSecretary(uint groupId) public view returns(address) {
         return groups[groupId].secretary;
@@ -133,19 +148,19 @@ contract Tandapay {
         return groups[groupId].paidPremiumCount;
     }
 
-    function isActive(uint groupId) public view returns(bool) {
-        return (groups[groupId].newPeriod.phase == Phase.ACTIVE);
+    function isGroupActive(uint groupId) public view returns(bool) {
+        return (groups[groupId].activePeriod.active);
     }
 
     function prePeriodStart(uint groupId) public view returns(bool) {
-      return (groups[groupId].newPeriod.phase == Phase.PRE);
+        return (groups[groupId].prePeriod.active);
     }
 
     function isMember(uint groupId, address add) public view returns(bool){
-      return (groups[groupId].userMapping[add] != 0);
+        return (groups[groupId].userMapping[add] != 0);
     }
 
     function getGroupPremium(uint groupId) public view returns(uint) {
-      return groups[groupId].premium;
+        return groups[groupId].premium;
     }
 }
