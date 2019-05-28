@@ -45,7 +45,10 @@ describe('TandaPay Contract', () => {
     assert.equal(true, isMember);
   });
 
-  it('start pre-period, pay all premiums, and start active period', async () => {
+  it('start pre-period, pay all premiums, start active period, and end active period', async function() {
+    this.timeout(0);  // Disable timeouts for this test to prevent timeout error
+                      // See: https://github.com/mochajs/mocha/issues/2025
+    
     // Start group pre-period
     await tandapay.methods.startPrePeriod(0).send({
       from:secretary, gas: '1000000'
@@ -66,9 +69,16 @@ describe('TandaPay Contract', () => {
     await tandapay.methods.startActivePeriod(0).send({
       from: secretary, gas: '1000000'
     });
-
     isActive = await tandapay.methods.isGroupActive(0).call();
     assert.equal(true, isActive);
+
+    // End Active period
+    await tandapay.methods.endActivePeriod(0, false).send({
+      from: secretary, gas: '1000000'
+    });
+    isActive = await tandapay.methods.isGroupActive(0).call();
+    assert.equal(false, isActive);
+
   });
 
 });
