@@ -1,7 +1,24 @@
 const assert = require('assert');
 const ganache = require('ganache-cli');
 const Web3 = require('web3');
-const provider = ganache.provider();
+const provider = ganache.provider({
+    // This object allows us to specify 12 accounts intead of 10 for
+    // the ganache provider
+    accounts: [
+        { balance: 0x56bc75e2d63100000 }, // Account 1
+        { balance: 0x56bc75e2d63100000 }, // Account 2
+        { balance: 0x56bc75e2d63100000 }, // Account 3
+        { balance: 0x56bc75e2d63100000 }, // Account 4
+        { balance: 0x56bc75e2d63100000 }, // Account 5
+        { balance: 0x56bc75e2d63100000 }, // Account 6
+        { balance: 0x56bc75e2d63100000 }, // Account 7
+        { balance: 0x56bc75e2d63100000 }, // Account 8
+        { balance: 0x56bc75e2d63100000 }, // Account 9
+        { balance: 0x56bc75e2d63100000 }, // Account 10
+        { balance: 0x56bc75e2d63100000 }, // Account 11
+        { balance: 0x56bc75e2d63100000 }, // Account 12
+    ]
+});
 const web3 = new Web3(provider);
 
 const { interface, bytecode } = require('../compile');
@@ -21,7 +38,7 @@ beforeEach( async () => {
     .deploy( {data: bytecode })
     .send( {from: admin, gas: '1000000 '});
   // Create a new group
-  await tandapay.methods.makeGroup(secretary, accounts, 1, 1 * 10)
+  await tandapay.methods.makeGroup(secretary, accounts, 1, 1 * accounts.length)
     .send({from: admin, gas: '1000000'});
 });
 

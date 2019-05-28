@@ -2,7 +2,7 @@ pragma solidity ^0.4.17;
 
 
 contract Tandapay {
-    uint public minGroupSize = 10; //Set 10 for testing purpose
+    uint public minGroupSize = 12; //Set 12 to match spec
     // userMapping code: {0: not in group, 1: in group but not paid for any active periods, 2: in group and paid}
 
     struct Period {
