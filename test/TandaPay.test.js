@@ -57,52 +57,45 @@ describe('TandaPay Contract', () => {
     assert.equal(secretary, groupSecretary);
   });
 
-  it('start pre-period', async () => {
-    await tandapay.methods.startPrePeriod(0).send({
-      from:secretary, gas: '1000000'
-    });
-    isPre = await tandapay.methods.prePeriodStart(0).call();
-    assert.equal(true, isPre);
-  });
-
   it('is a member', async() => {
     isMember = await tandapay.methods.isMember(0, accounts[1]).call();
     assert.equal(true, isMember);
   });
 
-/***********************
-** Not tested yet
-**************************/
-/*
-  it('pay a premium', async() => {
-    let premium = await tandapay.methods.getGroupPremium(0).call();
-    await tandapay.methods.sendPremium(0).send({
-      value: premium,
-      from: accounts[1]
+  it('start pre-period, pay all premiums, start active period, and end active period', async function() {
+    this.timeout(0);  // Disable timeouts for this test to prevent timeout error
+                      // See: https://github.com/mochajs/mocha/issues/2025
+    
+    // Start group pre-period
+    await tandapay.methods.startPrePeriod(0).send({
+      from:secretary, gas: '1000000'
     });
-    paidCount = await tandapay.methods.getGroupPaidCount(0).call();
-    assert.equal(paidCount, 1);
-  });
 
-  it('all premium paid', async () => {
-    for (let acccount in accounts) {
-      await tandapay.methods.sendPremium(premium).send({
-        from: account, gas: '1000000'
+    let premium = await tandapay.methods.getGroupPremium(0).call();
+    //Pay all premiums
+    for (let i = 0; i < minGroupSize; i++) {
+      await tandapay.methods.sendPremium(0).send({
+        value: premium,
+        from: accounts[i]
       });
     }
     paidCount = await tandapay.methods.getGroupPaidCount(0).call();
     assert.equal(minGroupSize, paidCount);
-  })
 
-  it('start active period', async () => {
+    //Start active period
     await tandapay.methods.startActivePeriod(0).send({
       from: secretary, gas: '1000000'
     });
-    isActive = await tandapay.methods.isActive(0).call();
+    isActive = await tandapay.methods.isGroupActive(0).call();
     assert.equal(true, isActive);
+
+    // End Active period
+    await tandapay.methods.endActivePeriod(0, false).send({
+      from: secretary, gas: '1000000'
+    });
+    isActive = await tandapay.methods.isGroupActive(0).call();
+    assert.equal(false, isActive);
+
   });
-*/
-
-
 
 });
