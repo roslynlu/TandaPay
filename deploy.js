@@ -4,7 +4,7 @@ const HDWalletProvider = require('truffle-hdwallet-provider');
 const Web3 = require('web3');
 const { interface, bytecode } = require('./compile');
 
-mnemonic = process.env.MNEMONIC 
+mnemonic = process.env.MNEMONIC
 infura_url = process.env.INFURA_URL
 
 const provider = new HDWalletProvider (mnemomic, infura_url);
