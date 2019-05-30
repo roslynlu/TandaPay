@@ -9,13 +9,26 @@ contract Tandapay {
         bool active;
         uint startTime;
     }
+    
+    struct userState {
+        uint nextPremium;
+        uint latestClaim;
+    }
+
+    struct Claim {
+        address policyholder;
+        uint claimAmount;
+        uint period;
+        bool approved;
+    }
 
     struct Group {
         uint groupId;
         address secretary;
         /* Maps each policyholder to a number. Increment this number to match periodCount
         everytime they pay the premium */
-        mapping(address => uint) userMapping;
+        mapping(address => userState) userMapping;
+        mapping(uint => Claim) claimMapping;
         uint paidPremiumCount;
         uint premium;
         uint maxClaim;
@@ -23,8 +36,10 @@ contract Tandapay {
         Period activePeriod;
         Period postPeriod;
         uint etherBalance;
+        uint claimBalance;
         /* Keep track of period */
         uint periodCount;
+        uint claimIndex;
         /* Keep track of number of policyholders in group */
         uint policyholderCount;
     }
@@ -61,7 +76,9 @@ contract Tandapay {
             activePeriod: Period(false, now),
             postPeriod: Period(false, now),
             etherBalance: 0,
+            claimBalance: 0,
             periodCount: 1,
+            claimIndex: 0,
             policyholderCount: policyholders.length
         });
 
@@ -71,9 +88,9 @@ contract Tandapay {
         for (uint i = 0; i < policyholders.length; i++) {
           /* initial periodCount is 1
           users map to 1 to indicate they have to pay premiums for period 1 */
-          currentGroup.userMapping[policyholders[i]] = 1;
+          currentGroup.userMapping[policyholders[i]] = userState(1, 0);
         }
-        require(currentGroup.userMapping[secretary] == 1); // Checks if secreatry was one of the passed in policyholders
+        require(currentGroup.userMapping[secretary].nextPremium == 1); // Checks if secreatry was one of the passed in policyholders
 
         groupIndex += 1;
     }
@@ -95,9 +112,9 @@ contract Tandapay {
         Group storage currentGroup = groups[groupId]; //If groupId is not valid, errors here
         require(msg.value == currentGroup.premium);
         require(currentGroup.prePeriod.active); // Assume any Period in pre-period phase is the newPeriod
-        require(currentGroup.userMapping[msg.sender] == currentGroup.periodCount); // User is part of group and has not paid the premium
+        require(currentGroup.userMapping[msg.sender].nextPremium == currentGroup.periodCount); // User is part of group and has not paid the premium
 
-        currentGroup.userMapping[msg.sender]++;
+        currentGroup.userMapping[msg.sender].nextPremium++;
         currentGroup.etherBalance += msg.value;
         currentGroup.paidPremiumCount += 1;
     }
@@ -137,6 +154,39 @@ contract Tandapay {
 
     }
 
+    // A policyholder can file a claim during the active period
+    function fileClaim(uint groupId, uint claimAmount) public {
+        Group storage currentGroup = groups[groupId];
+
+        require(claimAmount <= currentGroup.etherBalance - currentGroup.claimBalance);
+        require(currentGroup.userMapping[msg.sender].latestClaim != currentGroup.periodCount - 1);
+        require(currentGroup.userMapping[msg.sender].nextPremium == currentGroup.periodCount - 1); // user has paid premium
+        require(currentGroup.activePeriod.active);
+        
+        currentGroup.claimMapping[currentGroup.claimIndex] = Claim(
+            msg.sender, claimAmount, currentGroup.periodCount - 1, false);
+        currentGroup.claimBalance += claimAmount;
+        currentGroup.userMapping[msg.sender].latestClaim = currentGroup.periodCount - 1;
+        currentGroup.claimIndex++;
+        
+        // emit claim ID
+    }
+
+    // A Secretary can review a claim and approve it or reject it
+    function reviewClaim(uint groupId, uint claimId) public secretaryOnly(groupId) {
+        Group storage currentGroup = groups[groupId];
+        Claim storage currentClaim = currentGroup.claimMapping[claimId];
+
+        require(currentGroup.postPeriod.active);
+        require(!currentClaim.approved);
+        
+        currentClaim.approved = true;
+        
+        currentClaim.policyholder.transfer(currentClaim.claimAmount);
+        currentGroup.etherBalance -= currentClaim.claimAmount;
+        
+    }
+
     function getGroupSecretary(uint groupId) public view returns(address) {
         return groups[groupId].secretary;
     }
@@ -158,7 +208,7 @@ contract Tandapay {
     }
 
     function isMember(uint groupId, address add) public view returns(bool){
-        return (groups[groupId].userMapping[add] != 0);
+        return (groups[groupId].userMapping[add].nextPremium != 0);
     }
 
     function getGroupPremium(uint groupId) public view returns(uint) {
