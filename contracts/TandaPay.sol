@@ -87,7 +87,9 @@ contract Tandapay {
         Group storage currentGroup = groups[groupIndex];
         for (uint i = 0; i < policyholders.length; i++) {
           /* initial periodCount is 1
-          users map to 1 to indicate they have to pay premiums for period 1 */
+          users map to 1 to indicate they have to pay premiums for period 1.
+          This require statement enforces uniqueness in the policyholders */
+          require(!isMember(groupIndex, policyholders[i]));
           currentGroup.userMapping[policyholders[i]] = userState(1, 0);
         }
         require(currentGroup.userMapping[secretary].nextPremium == 1); // Checks if secreatry was one of the passed in policyholders
