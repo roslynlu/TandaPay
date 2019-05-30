@@ -19,7 +19,7 @@ contract Tandapay {
         address policyholder;
         uint claimAmount;
         uint period;
-        bool approved;
+        int claimState;
     }
 
     struct Group {
@@ -164,7 +164,7 @@ contract Tandapay {
         require(currentGroup.activePeriod.active);
         
         currentGroup.claimMapping[currentGroup.claimIndex] = Claim(
-            msg.sender, claimAmount, currentGroup.periodCount - 1, false);
+            msg.sender, claimAmount, currentGroup.periodCount - 1, 0);
         currentGroup.claimBalance += claimAmount;
         currentGroup.userMapping[msg.sender].latestClaim = currentGroup.periodCount - 1;
         currentGroup.claimIndex++;
@@ -173,17 +173,24 @@ contract Tandapay {
     }
 
     // A Secretary can review a claim and approve it or reject it
-    function reviewClaim(uint groupId, uint claimId) public secretaryOnly(groupId) {
+    function reviewClaim(uint groupId, uint claimId, bool accept) public secretaryOnly(groupId) {
         Group storage currentGroup = groups[groupId];
         Claim storage currentClaim = currentGroup.claimMapping[claimId];
 
         require(currentGroup.postPeriod.active);
-        require(!currentClaim.approved);
+        require(currentClaim.claimState == 0);
         
-        currentClaim.approved = true;
+        if(accept) {
+            currentClaim.claimState = 1;
+            currentClaim.policyholder.transfer(currentClaim.claimAmount);
+            currentGroup.etherBalance -= currentClaim.claimAmount;
+        }
+        else {
+            currentClaim.claimState = -1;
+        }
         
-        currentClaim.policyholder.transfer(currentClaim.claimAmount);
         currentGroup.etherBalance -= currentClaim.claimAmount;
+        
         
     }
 
