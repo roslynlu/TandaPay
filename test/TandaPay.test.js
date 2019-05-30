@@ -19,7 +19,7 @@ beforeEach( async () => {
   // Deploy a contract
   tandapay = await new web3.eth.Contract(JSON.parse(interface))
     .deploy( {data: bytecode })
-    .send( {from: admin, gas: '1000000 '});
+    .send( {from: admin, gas: '5000000 '});
   // Create a new group
   await tandapay.methods.makeGroup(secretary, accounts, 1, 1 * 10)
     .send({from: admin, gas: '1000000'});
