@@ -1,9 +1,12 @@
-pragma solidity ^0.4.17;
-
+pragma solidity ^0.4.21;
 
 contract Tandapay {
     uint public minGroupSize = 10; //Set 10 for testing purpose
     // userMapping code: {0: not in group, 1: in group but not paid for any active periods, 2: in group and paid}
+
+    event EventId (
+        uint eId
+    );
 
     struct Period {
         bool active;
@@ -11,11 +14,12 @@ contract Tandapay {
     }
     
     struct userState {
-        uint nextPremium;
-        uint latestClaim;
+        uint nextPremium; // next period they need to pay premiums 
+        uint latestClaim; 
     }
 
     struct Claim {
+      string description;
         address policyholder;
         uint claimAmount;
         uint period;
@@ -25,12 +29,12 @@ contract Tandapay {
     struct Group {
         uint groupId;
         address secretary;
-        /* Maps each policyholder to a number. Increment this number to match periodCount
-        everytime they pay the premium */
+        /* Maps each policyholder to a number. Increment this number to match periodCount everytime they pay the premium */
         mapping(address => userState) userMapping;
-        mapping(uint => Claim) claimMapping;
+        mapping(uint => Claim) claimMapping; 
         uint paidPremiumCount;
         uint premium;
+        uint currentPremium;
         uint maxClaim;
         Period prePeriod;
         Period activePeriod;
@@ -42,10 +46,17 @@ contract Tandapay {
         uint claimIndex;
         /* Keep track of number of policyholders in group */
         uint policyholderCount;
+    //Is this allowed?
+    /*Claim[] claims;
+
+    uint claimIndex;
+    uint runningBalance;*/
     }
+
     Group[] groups;
     address public administrator;
     uint public groupIndex; //count
+        
 
     modifier secretaryOnly(uint groupId) {
         require(groups[groupId].secretary == msg.sender);
@@ -57,10 +68,13 @@ contract Tandapay {
         groupIndex = 0;
     }
 
-    function makeGroup(address secretary, address[] policyholders, uint premium, uint maxClaim) public {
+    // Add event when create a new group
+    event GroupCreated(uint groupId);
+
+    function makeGroup(address _secretary, address[] policyholders, uint _premium, uint _maxClaim) public {
         require(msg.sender == administrator);
         require(policyholders.length >= minGroupSize);
-        require(maxClaim <= premium * policyholders.length);
+        require(_maxClaim <= _premium * policyholders.length);
         ///////////////////////////////////////////////////////////////////////////////////
         // Do we want to add a check to make sure all elements of policyholders are unique?
         // If there are duplicates, it messes up paidPremiumCount logic.
@@ -68,10 +82,11 @@ contract Tandapay {
 
         Group memory newGroup = Group({
             groupId: groupIndex,
-            secretary: secretary,
+            secretary: _secretary,
             paidPremiumCount: 0,
-            premium: premium,
-            maxClaim: maxClaim,
+            premium: _premium,
+            currentPremium: _premium ,
+            maxClaim: _maxClaim,
             prePeriod: Period(false, now),
             activePeriod: Period(false, now),
             postPeriod: Period(false, now),
@@ -87,13 +102,13 @@ contract Tandapay {
         Group storage currentGroup = groups[groupIndex];
         for (uint i = 0; i < policyholders.length; i++) {
           /* initial periodCount is 1
-          users map to 1 to indicate they have to pay premiums for period 1.
-          This require statement enforces uniqueness in the policyholders */
-          require(!isMember(groupIndex, policyholders[i]));
+          users map to 1 to indicate they have to pay premiums for period 1 */
           currentGroup.userMapping[policyholders[i]] = userState(1, 0);
         }
-        require(currentGroup.userMapping[secretary].nextPremium == 1); // Checks if secreatry was one of the passed in policyholders
+        require(currentGroup.userMapping[_secretary].nextPremium == 1); // Checks if secreatry was one of the passed in policyholders
 
+        emit EventId(groupIndex); 
+        
         groupIndex += 1;
     }
 
@@ -103,7 +118,11 @@ contract Tandapay {
 
         currentGroup.prePeriod = Period(true, now);
         currentGroup.postPeriod = Period(false, now);
-
+    
+        // Calculate the new premium from leftover balance
+        ///////////////////////////////////
+        currentGroup.currentPremium = (currentGroup.premium*currentGroup.policyholderCount - (currentGroup.etherBalance - currentGroup.claimBalance)) / currentGroup.policyholderCount;
+        /////////////////////////////
         /////////////////////////////////////////////
         // TODO: add logic that enforces 3 day window
         /////////////////////////////////////////////
@@ -111,11 +130,12 @@ contract Tandapay {
 
     // A policyholder can send a premium payment to a group
     function sendPremium(uint groupId) public payable {
+
         Group storage currentGroup = groups[groupId]; //If groupId is not valid, errors here
-        require(msg.value == currentGroup.premium);
+        require(msg.value == currentGroup.currentPremium);
         require(currentGroup.prePeriod.active); // Assume any Period in pre-period phase is the newPeriod
         require(currentGroup.userMapping[msg.sender].nextPremium == currentGroup.periodCount); // User is part of group and has not paid the premium
-
+    // What if new premium is 0?
         currentGroup.userMapping[msg.sender].nextPremium++;
         currentGroup.etherBalance += msg.value;
         currentGroup.paidPremiumCount += 1;
@@ -157,21 +177,22 @@ contract Tandapay {
     }
 
     // A policyholder can file a claim during the active period
-    function fileClaim(uint groupId, uint claimAmount) public {
+    function fileClaim(uint groupId, uint claimAmount, string claimDescription) public {
         Group storage currentGroup = groups[groupId];
 
         require(claimAmount <= currentGroup.etherBalance - currentGroup.claimBalance);
         require(currentGroup.userMapping[msg.sender].latestClaim != currentGroup.periodCount - 1);
-        require(currentGroup.userMapping[msg.sender].nextPremium == currentGroup.periodCount - 1); // user has paid premium
+        require(currentGroup.userMapping[msg.sender].nextPremium == currentGroup.periodCount); // user has paid premium
         require(currentGroup.activePeriod.active);
         
         currentGroup.claimMapping[currentGroup.claimIndex] = Claim(
-            msg.sender, claimAmount, currentGroup.periodCount - 1, 0);
+            claimDescription, msg.sender, claimAmount, currentGroup.periodCount - 1, 0);
         currentGroup.claimBalance += claimAmount;
         currentGroup.userMapping[msg.sender].latestClaim = currentGroup.periodCount - 1;
-        currentGroup.claimIndex++;
-        
-        // emit claim ID
+    
+        emit EventId(currentGroup.claimIndex);
+
+        currentGroup.claimIndex++;  
     }
 
     // A Secretary can review a claim and approve it or reject it
@@ -191,7 +212,7 @@ contract Tandapay {
             currentClaim.claimState = -1;
         }
         
-        currentGroup.etherBalance -= currentClaim.claimAmount;
+        currentGroup.claimBalance -= currentClaim.claimAmount;
         
         
     }
