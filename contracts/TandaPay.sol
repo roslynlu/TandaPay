@@ -1,7 +1,21 @@
 pragma solidity ^0.4.21;
 
+// Interface copied from WIkipedia
+contract ERC20Interface {
+    function totalSupply() public view returns (uint);
+    function balanceOf(address tokenOwner) public view returns (uint balance);
+    function allowance(address tokenOwner, address spender) public view returns (uint remaining);
+    function transfer(address to, uint tokens) public returns (bool success);
+    function approve(address spender, uint tokens) public returns (bool success);
+    function transferFrom(address from, address to, uint tokens) public returns (bool success);
+
+    event Transfer(address indexed from, address indexed to, uint tokens);
+    event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
+}
+
 contract Tandapay {
     uint public minGroupSize = 10; //Set 10 for testing purpose
+    ERC20Interface public PlaceholderContract;
 
     event GroupCreated(uint groupId);
     event PremiumPaid(uint groupId, address policyholder, uint period);
@@ -38,10 +52,12 @@ contract Tandapay {
         Period prePeriod;
         Period activePeriod;
         Period postPeriod;
-        uint etherBalance;
+        uint balance;
         uint claimBalance;
         uint periodCount; // Which period group is currently in, starts at 1
         uint claimIndex; // Id to be given to next claim filed, starts at 0
+        uint activeClaimCount;
+        uint postClaimCount;
         uint policyholderCount;
     }
 
@@ -74,10 +90,12 @@ contract Tandapay {
             prePeriod: Period(false, now),
             activePeriod: Period(false, now),
             postPeriod: Period(false, now),
-            etherBalance: 0,
+            balance: 0,
             claimBalance: 0,
             periodCount: 1,
             claimIndex: 0,
+            activeClaimCount: 0,
+            postClaimCount: 0,
             policyholderCount: policyholders.length
         });
 
@@ -107,7 +125,7 @@ contract Tandapay {
         currentGroup.postPeriod = Period(false, now);
     
         // Calculate the new premium from leftover balance
-        currentGroup.currentPremium = (currentGroup.premium*currentGroup.policyholderCount - (currentGroup.etherBalance - currentGroup.claimBalance)) / currentGroup.policyholderCount;
+        currentGroup.currentPremium = (currentGroup.premium*currentGroup.policyholderCount - (currentGroup.balance - currentGroup.claimBalance)) / currentGroup.policyholderCount;
 
         /////////////////////////////////////////////
         // TODO: add logic that enforces 3 day window
@@ -116,7 +134,6 @@ contract Tandapay {
 
     // A policyholder can send a premium payment to a group
     function sendPremium(uint groupId) public payable {
-
         Group storage currentGroup = groups[groupId]; //If groupId is not valid, errors here
         require(msg.value == currentGroup.currentPremium);
         require(currentGroup.prePeriod.active);
@@ -126,14 +143,16 @@ contract Tandapay {
 
         // What if new premium is 0?
         currentGroup.userMapping[msg.sender].nextPremium++;
-        currentGroup.etherBalance += msg.value;
+        currentGroup.balance += msg.value;
         currentGroup.paidPremiumCount += 1;
     }
 
     // A Secretary can start the active period
     function startActivePeriod(uint groupId) public secretaryOnly(groupId){
         Group storage currentGroup = groups[groupId];//If groupId is not valid, errors here
-
+        
+        // require(currrentGroup.postClaimCount == 0)
+        
         require(currentGroup.paidPremiumCount == currentGroup.policyholderCount); //All premiums have been paid
         require(currentGroup.prePeriod.active); //Group is not active
 
@@ -153,16 +172,18 @@ contract Tandapay {
             /////////////////////////////////////////////////
             // I have no idea what is supposed to happen here
             /////////////////////////////////////////////////
-            require(true); // No claims have been filed
+            require(currentGroup.activeClaimCount == 0); // No claims have been filed
         }
 
         require(currentGroup.activePeriod.active);
-
-        // To-Do: Below currently causes test to fail. Why? Find fix.
+        require(currentGroup.postClaimCount == 0); // all claims from previous period have been reviewed
+        // To-Do: Below currently causes test to fail.
         // require(currentGroup.activePeriod.startTime <= now - 30 days);
 
         currentGroup.activePeriod.active = false;
         currentGroup.postPeriod = Period(true, now);
+        currentGroup.postClaimCount = currentGroup.activeClaimCount;
+        currentGroup.activeClaimCount = 0;
 
         if (continueToPeriod) {
             startActivePeriod(groupId);
@@ -173,7 +194,7 @@ contract Tandapay {
     function fileClaim(uint groupId, uint claimAmount, string claimDescription) public {
         Group storage currentGroup = groups[groupId];
 
-        require(claimAmount <= currentGroup.etherBalance - currentGroup.claimBalance);
+        require(claimAmount <= currentGroup.balance - currentGroup.claimBalance);
         require(currentGroup.userMapping[msg.sender].latestClaim != currentGroup.periodCount - 1);
         require(currentGroup.userMapping[msg.sender].nextPremium == currentGroup.periodCount); // user has paid premium
         require(currentGroup.activePeriod.active);
@@ -183,6 +204,7 @@ contract Tandapay {
         );
         currentGroup.claimBalance += claimAmount;
         currentGroup.userMapping[msg.sender].latestClaim = currentGroup.periodCount - 1;
+        currentGroup.activeClaimCount++;
     
         emit ClaimFiled(currentGroup.groupId, currentGroup.claimIndex);
 
@@ -200,13 +222,16 @@ contract Tandapay {
         if(accept) {
             currentClaim.claimState = 1;
             currentClaim.policyholder.transfer(currentClaim.claimAmount);
-            currentGroup.etherBalance -= currentClaim.claimAmount;
+            currentGroup.balance -= currentClaim.claimAmount;
         }
         else {
             currentClaim.claimState = -1;
         }
         
         currentGroup.claimBalance -= currentClaim.claimAmount;
+        currentGroup.postClaimCount--;
+        
+        emit ClaimReviewed(currentGroup.groupId, claimId, accept);
     }
 
     function getGroupSecretary(uint groupId) public view returns(address) {
