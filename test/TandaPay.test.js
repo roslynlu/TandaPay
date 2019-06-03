@@ -11,6 +11,7 @@ let accounts;
 let admin;
 let secretary;
 let minGroupSize = 10;
+let groupCreateEvent;
 
 beforeEach( async () => {
   accounts = await web3.eth.getAccounts();
@@ -21,13 +22,14 @@ beforeEach( async () => {
     .deploy( {data: bytecode })
     .send( {from: admin, gas: '5000000 '});
   // Create a new group
-  await tandapay.methods.makeGroup(secretary, accounts, 1, 1 * 10)
+  groupCreateEvent = await tandapay.methods.makeGroup(secretary, accounts, 1, 1 * 10)
     .send({from: admin, gas: '1000000'});
 });
 
 describe('TandaPay Contract', () => {
   it('deploys a contract', () => {
     assert.ok(tandapay.options.address);
+    assert.ok(groupCreateEvent.events['GroupCreated']);
   });
 
   it('check admin', async () => {
@@ -48,7 +50,6 @@ describe('TandaPay Contract', () => {
   it('start pre-period, pay all premiums, start active period, and end active period', async function() {
     this.timeout(0);  // Disable timeouts for this test to prevent timeout error
                       // See: https://github.com/mochajs/mocha/issues/2025
-    
     // Start group pre-period
     await tandapay.methods.startPrePeriod(0).send({
       from:secretary, gas: '1000000'
@@ -57,10 +58,12 @@ describe('TandaPay Contract', () => {
     let premium = await tandapay.methods.getGroupPremium(0).call();
     //Pay all premiums
     for (let i = 0; i < minGroupSize; i++) {
-      await tandapay.methods.sendPremium(0).send({
+      let premiumPaidEvent = null
+      premiumPaidEvent = await tandapay.methods.sendPremium(0).send({
         value: premium,
         from: accounts[i]
       });
+      assert.ok(premiumPaidEvent.events['PremiumPaid'])
     }
     paidCount = await tandapay.methods.getGroupPaidCount(0).call();
     assert.equal(minGroupSize, paidCount);
@@ -78,7 +81,5 @@ describe('TandaPay Contract', () => {
     });
     isActive = await tandapay.methods.isGroupActive(0).call();
     assert.equal(false, isActive);
-
   });
-
 });
