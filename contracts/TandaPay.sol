@@ -177,8 +177,7 @@ contract Tandapay {
 
         require(currentGroup.activePeriod.active);
         require(currentGroup.postClaimCount == 0); // all claims from previous period have been reviewed
-        // To-Do: Below currently causes test to fail.
-        // require(currentGroup.activePeriod.startTime <= now - 30 days);
+        require(currentGroup.activePeriod.startTime <= now - 30 days);
 
         currentGroup.activePeriod.active = false;
         currentGroup.postPeriod = Period(true, now);

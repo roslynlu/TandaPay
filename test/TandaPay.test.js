@@ -112,13 +112,13 @@ describe('TandaPay Contract Test Suite', function() {
         assert.ok(isActive);
       });
 
-      // it('does not allow active period to end before 30 days', async function() {
-      //   await truffleAssert.reverts(
-      //     tandapay.methods.endActivePeriod(0, false).send({
-      //       from: secretary, gas: '1000000'
-      //     })
-      //   );
-      // });
+      it('does not allow active period to end before 30 days', async function() {
+        await truffleAssert.reverts(
+          tandapay.methods.endActivePeriod(0, false).send({
+            from: secretary, gas: '1000000'
+          })
+        );
+      });
       
       it('allows a user to file a claim');
       
