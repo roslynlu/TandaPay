@@ -133,18 +133,24 @@ contract Tandapay {
     }
 
     // A policyholder can send a premium payment to a group
+    // Remove payable when using erc20
     function sendPremium(uint groupId) public payable {
         Group storage currentGroup = groups[groupId]; //If groupId is not valid, errors here
+        //////////////////////////////////////////////////
         require(msg.value == currentGroup.currentPremium);
+        //////////////////////////////////////////////////
+        // Replace above with:
+        // PlaceholderContract.approve(this, currentGroup.currentPremium);
+        // require(PlaceholderContract.transferFrom(msg.sender, this, currentGroup.currentPremium));
         require(currentGroup.prePeriod.active);
         require(currentGroup.userMapping[msg.sender].nextPremium == currentGroup.periodCount); // User is part of group and has not paid the premium
         
-        emit PremiumPaid(currentGroup.groupId, msg.sender, currentGroup.periodCount);
-
         // What if new premium is 0?
         currentGroup.userMapping[msg.sender].nextPremium++;
         currentGroup.balance += msg.value;
         currentGroup.paidPremiumCount += 1;
+        
+        emit PremiumPaid(currentGroup.groupId, msg.sender, currentGroup.periodCount);
     }
 
     // A Secretary can start the active period
@@ -221,7 +227,12 @@ contract Tandapay {
         
         if(accept) {
             currentClaim.claimState = 1;
+            
             currentClaim.policyholder.transfer(currentClaim.claimAmount);
+            /////////////////////////////////////////////////////////////
+            // Replace above with:
+            // require(PlaceholderContract.transfer(currentClaim.policyholder, currentClaim.claimAmount));
+            
             currentGroup.balance -= currentClaim.claimAmount;
         }
         else {
