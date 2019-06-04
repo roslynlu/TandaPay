@@ -17,6 +17,7 @@ let minGroupSize = 10;
 let groupCreateEvent;
 let premium = 1;
 let nonSpecialAccount;
+let maxClaim;
 
 describe('TandaPay Contract Test Suite', function() {
   // Nested describe statements are allowed and make for a clearer delineation of tests
@@ -31,6 +32,7 @@ describe('TandaPay Contract Test Suite', function() {
     tandapay = await new web3.eth.Contract(JSON.parse(interface))
       .deploy( {data: bytecode })
       .send( {from: admin, gas: '5000000'});
+    maxClaim = premium * accounts.length;
   });
 
   describe('Test Happy Paths', function() {
@@ -38,7 +40,7 @@ describe('TandaPay Contract Test Suite', function() {
       secretary = accounts[1];
       // Create a new group
       groupCreateEvent = await tandapay.methods.makeGroup(secretary, accounts, premium,
-         premium * accounts.length)
+         maxClaim)
         .send({from: admin, gas: '1000000'});
     });
     
@@ -112,6 +114,28 @@ describe('TandaPay Contract Test Suite', function() {
         assert.ok(isActive);
       });
 
+      it('requires claims are less than maxClaim', async function() {
+          await truffleAssert.reverts(
+            tandapay.methods.fileClaim(0, maxClaim+1, "this is totally not fraud").send({
+            from: nonSpecialAccount, gas: '1000000'
+          })
+        );
+      });
+
+      it('allows a user to file a claim', async function() {
+        await tandapay.methods.fileClaim(0, maxClaim/2, "this is a real claim").send({
+            from: nonSpecialAccount, gas: '1000000'
+        });
+      });
+
+      it('does not allow a user to file multiple claims in 1 period', async function() {
+        await truffleAssert.reverts(
+          tandapay.methods.fileClaim(0, maxClaim/2, "this is a real claim").send({
+            from: nonSpecialAccount, gas: '1000000'
+          })
+        );
+      });
+
       it('does not allow active period to end before 30 days', async function() {
         await truffleAssert.reverts(
           tandapay.methods.endActivePeriod(0, false).send({
@@ -120,8 +144,7 @@ describe('TandaPay Contract Test Suite', function() {
         );
       });
       
-      it('allows a user to file a claim');
-      
+      //Note that this 
       it('lets the secretary end the active period after 30 days', async function () {
         await web3.currentProvider.send({
             jsonrpc: '2.0',
@@ -134,6 +157,20 @@ describe('TandaPay Contract Test Suite', function() {
         });
         isActive = await tandapay.methods.isGroupActive(0).call();
         assert.equal(false, isActive);
+      });
+
+      it('does not let regular users review claims', async function () {
+        await truffleAssert.reverts(
+          tandapay.methods.reviewClaim(0, 1, true).send({
+            from: nonSpecialAccount, gas: '1000000'
+          })
+        );
+      });
+
+      it('lets the secretary review claims', async function () {
+        await tandapay.methods.reviewClaim(0, 1, true).send({
+            from: secretary, gas: '1000000'
+        });
       });
 
       // it('does an end to end test of the period and claim functionality', async function() {
@@ -177,23 +214,23 @@ describe('TandaPay Contract Test Suite', function() {
   describe('Test makeGroup "require" statements', function () {
     it('only allows the admin to create a group', async function() {
       await truffleAssert.reverts(
-        tandapay.methods.makeGroup(secretary, accounts, premium, premium * accounts.length)
+        tandapay.methods.makeGroup(secretary, accounts, premium, maxClaim)
         .send({from: nonSpecialAccount, gas: '1000000'})
       );
     });
 
-    it('enforces the minimum group size of ' + minGroupSize.toString, async function() {
-      shortenedAccounts = accounts.slice(0, 11);
+    it('enforces the minimum group size of ' + minGroupSize.toString(), async function() {
+      shortenedAccounts = accounts.slice(0, minGroupSize-1);
       await truffleAssert.reverts(
-        tandapay.methods.makeGroup(admin, shortenedAccounts, premium, premium * shortenedAccounts.length)
-        .send({from: nonSpecialAccount, gas: '1000000'})
+        tandapay.methods.makeGroup(secretary, shortenedAccounts, premium, premium * shortenedAccounts.length)
+        .send({from: admin, gas: '1000000'})
       );
     });
 
     it('enforces the max claim is <= the group size * the premium', async function () {
       await truffleAssert.reverts(
-        tandapay.methods.makeGroup(admin, accounts, premium, 2 * premium * accounts.length)
-        .send({from: nonSpecialAccount, gas: '1000000'})
+        tandapay.methods.makeGroup(secretary, accounts, premium, 2 * maxClaim)
+        .send({from: admin, gas: '1000000'})
       );
     });
 
@@ -201,8 +238,8 @@ describe('TandaPay Contract Test Suite', function() {
       repeatedAccounts = accounts.slice();
       repeatedAccounts.push(accounts[0]);
       await truffleAssert.reverts(
-        tandapay.methods.makeGroup(admin, accounts, premium, 2 * premium * accounts.length)
-        .send({from: nonSpecialAccount, gas: '1000000'})
+        tandapay.methods.makeGroup(secretary, repeatedAccounts, premium, maxClaim)
+        .send({from: admin, gas: '1000000'})
       );
     });
 
