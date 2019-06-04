@@ -172,42 +172,6 @@ describe('TandaPay Contract Test Suite', function() {
             from: secretary, gas: '1000000'
         });
       });
-
-      // it('does an end to end test of the period and claim functionality', async function() {
-      //   this.timeout(0);  // Disable timeouts for this test to prevent timeout error
-      //                     // See: https://github.com/mochajs/mocha/issues/2025
-      //   // Start group pre-period
-      //   await tandapay.methods.startPrePeriod(0).send({
-      //     from:secretary, gas: '1000000'
-      //   });
-
-      //   let premium = await tandapay.methods.getGroupPremium(0).call();
-      //   //Pay all premiums
-      //   for (let i = 0; i < minGroupSize; i++) {
-      //     let premiumPaidEvent = null
-      //     premiumPaidEvent = await tandapay.methods.sendPremium(0).send({
-      //       value: premium,
-      //       from: accounts[i]
-      //     });
-      //     assert.ok(premiumPaidEvent.events['PremiumPaid'])
-      //   }
-      //   paidCount = await tandapay.methods.getGroupPaidCount(0).call();
-      //   assert.equal(minGroupSize, paidCount);
-
-      //   //Start active period
-      //   await tandapay.methods.startActivePeriod(0).send({
-      //     from: secretary, gas: '1000000'
-      //   });
-      //   isActive = await tandapay.methods.isGroupActive(0).call();
-      //   assert.equal(true, isActive);
-
-      //   // End Active period
-      //   await tandapay.methods.endActivePeriod(0, false).send({
-      //     from: secretary, gas: '1000000'
-      //   });
-      //   isActive = await tandapay.methods.isGroupActive(0).call();
-      //   assert.equal(false, isActive);
-      // });
     });
   });
   
@@ -244,42 +208,4 @@ describe('TandaPay Contract Test Suite', function() {
     });
 
   });
-  // describe('TandaPay Contract', function () {
-
-  //   it('start pre-period, pay all premiums, start active period, and end active period', async function() {
-  //     this.timeout(0);  // Disable timeouts for this test to prevent timeout error
-  //                       // See: https://github.com/mochajs/mocha/issues/2025
-  //     // Start group pre-period
-  //     await tandapay.methods.startPrePeriod(0).send({
-  //       from:secretary, gas: '1000000'
-  //     });
-
-  //     let premium = await tandapay.methods.getGroupPremium(0).call();
-  //     //Pay all premiums
-  //     for (let i = 0; i < minGroupSize; i++) {
-  //       let premiumPaidEvent = null
-  //       premiumPaidEvent = await tandapay.methods.sendPremium(0).send({
-  //         value: premium,
-  //         from: accounts[i]
-  //       });
-  //       assert.ok(premiumPaidEvent.events['PremiumPaid'])
-  //     }
-  //     paidCount = await tandapay.methods.getGroupPaidCount(0).call();
-  //     assert.equal(minGroupSize, paidCount);
-
-  //     //Start active period
-  //     await tandapay.methods.startActivePeriod(0).send({
-  //       from: secretary, gas: '1000000'
-  //     });
-  //     isActive = await tandapay.methods.isGroupActive(0).call();
-  //     assert.equal(true, isActive);
-
-  //     // End Active period
-  //     await tandapay.methods.endActivePeriod(0, false).send({
-  //       from: secretary, gas: '1000000'
-  //     });
-  //     isActive = await tandapay.methods.isGroupActive(0).call();
-  //     assert.equal(false, isActive);
-  //   });
-  // });
 });
