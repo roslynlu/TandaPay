@@ -2,22 +2,7 @@ const assert = require('assert');
 const ganache = require('ganache-cli');
 const Web3 = require('web3');
 const truffleAssert = require('truffle-assertions')
-const provider = ganache.provider([
-  // Add 12 accounts so we can enforce a min group size of 12
-  { 'balance': 0x56bc75e2d63100000 }, // Account 1
-  { 'balance': 0x56bc75e2d63100000 }, // Account 2
-  { 'balance': 0x56bc75e2d63100000 }, // Account 3
-  { 'balance': 0x56bc75e2d63100000 }, // Account 4
-  { 'balance': 0x56bc75e2d63100000 }, // Account 5
-  { 'balance': 0x56bc75e2d63100000 }, // Account 6
-  { 'balance': 0x56bc75e2d63100000 }, // Account 7
-  { 'balance': 0x56bc75e2d63100000 }, // Account 8
-  { 'balance': 0x56bc75e2d63100000 }, // Account 9
-  { 'balance': 0x56bc75e2d63100000 }, // Account 10
-  { 'balance': 0x56bc75e2d63100000 }, // Account 11
-  { 'balance': 0x56bc75e2d63100000 }, // Account 12
-  { 'balance': 0x56bc75e2d63100000 } 
-]);
+const provider = ganache.provider();
 // To remove a MaxListenersExceededWarning
 provider.setMaxListeners(12);
 
@@ -36,6 +21,9 @@ let nonSpecialAccount;
 describe('TandaPay Contract Test Suite', function() {
   // Nested describe statements are allowed and make for a clearer delineation of tests
   before( async function() {
+    // Getting more than 10 accounts out of this function is wayyy
+    // harder than it needs to be - involves creating more personal accounts
+    // then adding eth to all them - not worth the trouble
     accounts = await web3.eth.getAccounts();
     admin = accounts[0];
     nonSpecialAccount = accounts[3];

@@ -1,7 +1,7 @@
 pragma solidity ^0.4.21;
 
 contract Tandapay {
-    uint public minGroupSize = 12; //Set min group size to 12 as in spec
+    uint public minGroupSize = 10; //Set 10 for testing purpose
 
     event GroupCreated(uint groupId);
     event PremiumPaid(uint groupId, address policyholder, uint period);
