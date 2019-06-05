@@ -1,5 +1,6 @@
 # TandaPay
 How to get this repo running?
+
 0. Note that Node v10+ is a requirement for running this code
 1. `$ git clone` the repo to your local computer
 2. navigate to the directory you cloned into (e.g. `$ cd TandaPay`)
