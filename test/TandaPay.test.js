@@ -69,6 +69,15 @@ describe('TandaPay Contract Test Suite', function() {
         contractPremium = await tandapay.methods.getGroupPremium(0).call();
         assert.equal(contractPremium, premium);
       });
+
+      it('allows multiple groups', async () => {
+        await tandapay.methods.makeGroup(secretary, accounts, 1, 1 * 10)
+          .send({ from: admin, gas: '1000000' });
+        sec0 = await tandapay.methods.getGroupSecretary(0).call();
+        sec1 = await tandapay.methods.getGroupSecretary(1).call();
+        assert.equal(secretary, sec0);
+        assert.equal(secretary, sec1);
+      });
     });
 
     describe('Test Full Period and Claim Process', async function () {
@@ -86,6 +95,15 @@ describe('TandaPay Contract Test Suite', function() {
         });
         prePeriodStarted = await tandapay.methods.prePeriodStart(0);
         assert.ok(prePeriodStarted);
+      });
+
+      it('check full premium amount paid', async () => {
+        await truffleAssert.reverts(
+          await tandapay.methods.sendPremium(0).send({
+            value: premium - 1,
+            from: accounts[0]
+          });
+        );
       });
 
       it('stops active period from starting until premiums are paid', async function () {
