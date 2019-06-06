@@ -70,6 +70,7 @@ contract ERC20Interface {
     	require(msg.sender == to);
 
 	userBalance[to] += tokens;
+	total_supply += tokens;
 	
         return true;
     }
