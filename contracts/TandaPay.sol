@@ -1,16 +1,80 @@
 pragma solidity ^0.4.21;
 
-// Interface copied from WIkipedia
 contract ERC20Interface {
-    function totalSupply() public view returns (uint);
-    function balanceOf(address tokenOwner) public view returns (uint balance);
-    function allowance(address tokenOwner, address spender) public view returns (uint remaining);
-    function transfer(address to, uint tokens) public returns (bool success);
-    function approve(address spender, uint tokens) public returns (bool success);
-    function transferFrom(address from, address to, uint tokens) public returns (bool success);
+   
+   event Transfer(address indexed from, address indexed to, uint tokens);
+   event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
+	
+    address public admin;
+    uint public total_supply;
+    mapping (address => uint) public userBalance;
+    mapping (address => uint) public approveBalance;
+    mapping (address => mapping (address => uint)) public allowance;
+    
 
-    event Transfer(address indexed from, address indexed to, uint tokens);
-    event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
+    function ERC20Interface() public{
+        admin = msg.sender;
+	total_supply = 0;
+    }
+    
+
+    function totalSupply() public view returns (uint){
+        return total_supply;
+    }
+
+    function balanceOf(address tokenOwner) public view returns (uint){
+        return userBalance[tokenOwner];
+    }
+    
+    function allowance(address tokenOwner, address spender) public view returns (uint){
+        return allowance[tokenOwner][spender];
+    }
+
+    function transfer(address to, uint tokens) public returns (bool){
+    	require(userBalance[msg.sender] > 0);
+    	require(userBalance[msg.sender] >= tokens);
+
+	userBalance[msg.sender] -= tokens;
+	userBalance[to] += tokens;
+
+	emit Transfer(msg.sender, to, tokens);
+        return true;
+    }
+
+    function approve(address sender, address spender, uint tokens) public returns (bool){
+        require(userBalance[sender] > 0);
+	require(userBalance[sender] >= tokens);
+	require((approveBalance[sender] + tokens) <= userBalance[sender]);
+
+	approveBalance[sender] += tokens;
+	allowance[sender][spender] += tokens;
+
+	emit Approval(sender, spender, tokens);
+	return true;
+    }
+
+    function transferFrom(address from, address to, uint tokens) public returns (bool){
+    	require(allowance[from][to] > 0);
+	require(allowance[from][to] <= tokens);
+
+	userBalance[from] -= tokens;
+	userBalance[to] += tokens;
+	allowance[from][to] -= tokens;
+	approveBalance[from]  -= tokens;
+
+	emit Transfer(from, to, tokens);
+	return true;	
+    }
+
+    function deposit(address to, uint tokens) public returns (bool){
+    	require(msg.sender == to);
+
+	userBalance[to] += tokens;
+	
+        return true;
+    }
+
+    //function withraw() depends on how this interacts with Tandapay
 }
 
 contract Tandapay {
