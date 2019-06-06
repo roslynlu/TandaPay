@@ -15,7 +15,7 @@ let admin;
 let secretary;
 let minGroupSize = 10;
 let groupCreateEvent;
-let premium = 1;
+let premium = 10;
 let nonSpecialAccount;
 let maxClaim;
 
@@ -97,12 +97,12 @@ describe('TandaPay Contract Test Suite', function() {
         assert.ok(prePeriodStarted);
       });
 
-      it('check full premium amount paid', async () => {
+      it('check full premium amount paid', async function () {
         await truffleAssert.reverts(
-          await tandapay.methods.sendPremium(0).send({
+          tandapay.methods.sendPremium(0).send({
             value: premium - 1,
             from: accounts[0]
-          });
+          })
         );
       });
 
@@ -144,6 +144,8 @@ describe('TandaPay Contract Test Suite', function() {
         await tandapay.methods.fileClaim(0, maxClaim/2, "this is a real claim").send({
             from: nonSpecialAccount, gas: '1000000'
         });
+        claimbalance = await tandapay.methods.getClaimBalance(0).call();
+        assert.equal(maxClaim/2, claimbalance);
       });
 
       it('does not allow a user to file multiple claims in 1 period', async function() {
@@ -161,21 +163,6 @@ describe('TandaPay Contract Test Suite', function() {
           })
         );
       });
-      
-      //Note that this 
-      it('lets the secretary end the active period after 30 days', async function () {
-        await web3.currentProvider.send({
-            jsonrpc: '2.0',
-            method: 'evm_increaseTime',
-            params: [2635000],
-            id: 0,
-          }, () => {});
-        await tandapay.methods.endActivePeriod(0, false).send({
-          from: secretary, gas: '1000000'
-        });
-        isActive = await tandapay.methods.isGroupActive(0).call();
-        assert.equal(false, isActive);
-      });
 
       it('does not let regular users review claims', async function () {
         await truffleAssert.reverts(
@@ -185,10 +172,36 @@ describe('TandaPay Contract Test Suite', function() {
         );
       });
 
+      it('lets the secretary end the active period after 30 days', async function () {
+        await web3.currentProvider.send({
+          jsonrpc: '2.0',
+          method: 'evm_increaseTime',
+          params: [2635000],
+          id: 0,
+        }, () => { });
+        await tandapay.methods.endActivePeriod(0, false).send({
+          from: secretary, gas: '1000000'
+        });
+        isActive = await tandapay.methods.isGroupActive(0).call();
+        assert.equal(false, isActive);
+      });
+
       it('lets the secretary review claims', async function () {
         await tandapay.methods.reviewClaim(0, 1, true).send({
-            from: secretary, gas: '1000000'
+          from: secretary, gas: '1000000'
         });
+      });
+
+      it('premium value is updated when there is leftover money from previous period', async function() {
+        await tandapay.methods.startPrePeriod(0).send({
+          from: secretary, gas: '1000000'
+        });
+
+        //current premium should now be 5 eth, bc half of the money was claimed in the first active period
+        // SIDE NOTE: SINCE SOLIDITY CANNOT SUPPORT FLOATING POINTS/DECIMALS,
+        // CURPREMIUM CALCULATIONS TRUNCATE TO INT
+        curPremium = await tandapay.methods.getCurrentPremium(0).call();
+        assert.equal(5, curPremium);
       });
     });
   });

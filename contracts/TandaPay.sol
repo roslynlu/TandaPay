@@ -271,4 +271,12 @@ contract Tandapay {
     function getGroupPremium(uint groupId) public view returns(uint) {
         return groups[groupId].premium;
     }
+
+    function getCurrentPremium(uint groupId) public view returns(uint) {
+        return groups[groupId].currentPremium;
+    }
+
+    function getClaimBalance(uint groupId) public view returns(uint) {
+        return groups[groupId].claimBalance;
+    }
 }
